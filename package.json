@@ -17,6 +17,7 @@
     "dev:client": "npm run dev --workspace=@blackout/client",
     "dev:shared": "npm run dev --workspace=@blackout/shared",
     "dev": "concurrently -n shared,server,client -c blue,green,magenta \"npm:dev:shared\" \"npm:dev:server\" \"npm:dev:client\"",
+    "play": "npm run build:shared && npm run build:client && npm run dev:server",
     "smoke": "node scripts/smoke-test.mjs",
     "start:server": "npm run start --workspace=@blackout/server",
     "clean": "rimraf packages/*/dist packages/*/node_modules node_modules",

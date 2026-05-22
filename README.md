@@ -17,18 +17,23 @@
 
 Requirements: **Node 20+** and npm 10+.
 
+### Single-port mode (recommended — works behind any reverse proxy / forwarded port)
+
 ```bash
 npm install
-npm run build:shared    # build the shared schema package once
-
-# Terminal 1 — server
-npm run dev:server
-
-# Terminal 2 — client
-npm run dev:client
+npm run play         # builds shared+client, then starts the server
 ```
 
-Open <http://localhost:5173>. Enter a callsign, click **Quick Match**. Open a second tab and join too — instant multiplayer.
+Open <http://localhost:2567>. The game, the matchmaking endpoint, and the WebSocket all live behind one port and one origin. Enter a callsign, click **Quick Match**, and open extra tabs to add teammates.
+
+### Dev mode with HMR (two ports)
+
+```bash
+npm install
+npm run dev          # boots shared (watch), server (:2567), client (:5173)
+```
+
+Open <http://localhost:5173>. Vite proxies HTTP + WebSocket traffic to the game server, so you still only need port 5173 reachable.
 
 ### Production build
 

@@ -8,9 +8,15 @@ Encoder.BUFFER_SIZE = 64 * 1024;
 import express from 'express';
 import cors from 'cors';
 import http from 'http';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { ROOM_NAME } from '@blackout/shared';
 import { HeistRoom } from './rooms/HeistRoom.js';
 import { logger } from './lib/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT) || 2567;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -27,16 +33,36 @@ app.get('/health', (_req, res) => {
   });
 });
 
-app.get('/', (_req, res) => {
-  res.json({
-    name: 'Blackout Protocol Server',
-    version: '0.1.0',
-    rooms: [ROOM_NAME],
-  });
-});
-
 // Colyseus monitor (room/state inspection in dev)
 app.use('/monitor', monitor());
+
+// Serve the built client.  This collapses everything to ONE port and ONE
+// origin — no Vite proxy, no second forwarded port required.  HTTP, the
+// game files, and the WebSocket upgrade all live behind the same URL.
+const clientDist = path.resolve(__dirname, '../../client/dist');
+const hasClient = fs.existsSync(path.join(clientDist, 'index.html'));
+if (hasClient) {
+  app.use(express.static(clientDist, { index: false }));
+  app.get('/', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+  logger.info(`Serving built client from ${clientDist}`);
+} else {
+  app.get('/', (_req, res) => {
+    res.type('html').send(`<!doctype html>
+<html><head><title>Blackout Protocol — server</title>
+<style>body{font-family:system-ui;background:#07090d;color:#d8dbe2;max-width:640px;margin:60px auto;padding:0 24px;line-height:1.5}
+code{background:#11141a;padding:2px 6px;border-radius:4px;color:#36e2c2}
+h1{letter-spacing:.18em}</style></head>
+<body><h1>BLACKOUT<span style="color:#36e2c2">PROTOCOL</span></h1>
+<p>Server is running and ready to accept connections.</p>
+<p>To play, build the client and then refresh:</p>
+<pre><code>npm run build:client</code></pre>
+<p>Or run the Vite dev server separately (HMR):</p>
+<pre><code>npm run dev:client  # serves on :5173</code></pre>
+<p>Endpoints: <code>/health</code>, <code>/monitor</code>, <code>/matchmake/&lt;...&gt;</code></p>
+</body></html>`);
+  });
+  logger.info(`Client dist not built — \`npm run build:client\` to serve the game from this port.`);
+}
 
 const server = http.createServer(app);
 
