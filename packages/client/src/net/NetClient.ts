@@ -89,14 +89,11 @@ export class NetClient {
   private defaultUrl() {
     if (typeof window === 'undefined') return 'ws://localhost:2567';
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.hostname;
-    const port = window.location.port;
-    // Vite dev server (5173) doesn't proxy the Colyseus WebSocket upgrade path —
-    // only the /matchmake HTTP endpoint. Point directly at the game server.
-    if (port === '5173' || port === '4173') {
-      return `${proto}://${host}:2567`;
-    }
-    // Production / behind a reverse proxy: same origin.
+    // Same origin as the page.  Vite dev (and any production reverse proxy)
+    // routes /matchmake (HTTP) and short room-id paths (WS upgrade) to the
+    // game server.  This means everything works through whichever single
+    // hostname:port the browser already has access to — no extra port
+    // forwarding needed.
     return `${proto}://${window.location.host}`;
   }
 

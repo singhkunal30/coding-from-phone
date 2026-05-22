@@ -64,9 +64,6 @@ const startConnect = async (mode: 'create' | 'join') => {
   // Compute and show the URL we're about to try, so failures are debuggable at a glance.
   const previewUrl = serverInput.value || (() => {
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.hostname;
-    const port = window.location.port;
-    if (port === '5173' || port === '4173') return `${proto}://${host}:2567`;
     return `${proto}://${window.location.host}`;
   })();
   setStatus(`Connecting to ${previewUrl}…`);
