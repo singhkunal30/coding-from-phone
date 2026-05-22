@@ -56,7 +56,14 @@ export class NetClient {
   private defaultUrl() {
     if (typeof window === 'undefined') return 'ws://localhost:2567';
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    // Prefer same-origin (works behind Vite proxy and in production)
+    const host = window.location.hostname;
+    const port = window.location.port;
+    // Vite dev server (5173) doesn't proxy the Colyseus WebSocket upgrade path —
+    // only the /matchmake HTTP endpoint. Point directly at the game server.
+    if (port === '5173' || port === '4173') {
+      return `${proto}://${host}:2567`;
+    }
+    // Production / behind a reverse proxy: same origin.
     return `${proto}://${window.location.host}`;
   }
 
