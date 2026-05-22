@@ -13,14 +13,47 @@ export class NetClient {
   private client: Client | null = null;
   room: Room<HeistState> | null = null;
 
+  /** Visible to the UI for status reporting / error messages. */
+  lastUrl: string | null = null;
+
   async connect(opts: ConnectOptions): Promise<Room<HeistState>> {
     const url = opts.serverUrl || this.defaultUrl();
-    this.client = new Client(url);
+    this.lastUrl = url;
+    console.info(`[net] Connecting to ${url}`);
 
+    // Probe the HTTP endpoint first so we fail fast with a clear message instead
+    // of hanging on the WebSocket upgrade when the server is unreachable.
+    const httpUrl = url.replace(/^ws/, 'http');
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 4000);
+      const r = await fetch(`${httpUrl}/health`, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) throw new Error(`health check returned ${r.status}`);
+      console.info(`[net] health OK at ${httpUrl}/health`);
+    } catch (e: any) {
+      throw new Error(`Cannot reach server at ${httpUrl} (${e?.message ?? e}). ` +
+        `Make sure the game server is running and the port is reachable from this browser.`);
+    }
+
+    this.client = new Client(url);
     const joinOpts = { name: opts.name, className: opts.className };
-    const room = opts.mode === 'create'
-      ? await this.client.create<HeistState>(ROOM_NAME, joinOpts)
-      : await this.client.joinOrCreate<HeistState>(ROOM_NAME, joinOpts);
+
+    // joinOrCreate hangs forever if the WebSocket upgrade silently fails.
+    // Race it with a manual timeout so the UI can show a real error.
+    const joinPromise = opts.mode === 'create'
+      ? this.client.create<HeistState>(ROOM_NAME, joinOpts)
+      : this.client.joinOrCreate<HeistState>(ROOM_NAME, joinOpts);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(
+        `WebSocket upgrade timed out after 8s connecting to ${url}. ` +
+        `The HTTP matchmaking call succeeded but the WS handshake did not. ` +
+        `If you are using a cloud/dev environment, ensure port ${url.split(':').pop()} is forwarded to your browser.`
+      )), 8000);
+    });
+
+    const room = await Promise.race([joinPromise, timeoutPromise]);
+    console.info(`[net] Joined room ${room.roomId} as ${room.sessionId}`);
 
     this.room = room;
     this.storeReconnectToken(room);
