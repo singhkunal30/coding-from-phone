@@ -1,0 +1,26 @@
+services:
+  blackout-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.server
+    image: blackout-server:dev
+    container_name: blackout-server
+    environment:
+      PORT: 2567
+      HOST: 0.0.0.0
+      LOG_LEVEL: info
+    ports:
+      - "2567:2567"
+    restart: unless-stopped
+
+  blackout-client:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.client
+    image: blackout-client:dev
+    container_name: blackout-client
+    ports:
+      - "8080:8080"
+    depends_on:
+      - blackout-server
+    restart: unless-stopped

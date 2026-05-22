@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blackout Protocol</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="hud"></div>
+    <div id="overlay">
+      <div id="menu" class="panel">
+        <h1>BLACKOUT<span>PROTOCOL</span></h1>
+        <p class="tagline">Infiltrate. Extract. Disappear.</p>
+        <label>
+          Callsign
+          <input id="player-name" type="text" maxlength="20" placeholder="Operative" />
+        </label>
+        <label>
+          Server
+          <input id="server-url" type="text" placeholder="ws://localhost:2567" />
+        </label>
+        <div class="menu-actions">
+          <button id="btn-create">Create Heist</button>
+          <button id="btn-join">Quick Match</button>
+        </div>
+        <div id="menu-status" class="status"></div>
+        <div class="footer">v<span id="version"></span> &middot; co-op heist prototype</div>
+      </div>
+      <div id="end-screen" class="panel hidden">
+        <h2 id="end-title">Mission complete</h2>
+        <div id="end-summary"></div>
+        <button id="btn-rematch">Back to menu</button>
+      </div>
+    </div>
+    <canvas id="game"></canvas>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

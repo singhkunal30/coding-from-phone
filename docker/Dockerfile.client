@@ -1,0 +1,16 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/tsconfig.json packages/shared/
+COPY packages/server/package.json packages/server/tsconfig.json packages/server/
+COPY packages/client/package.json packages/client/tsconfig.json packages/client/
+RUN npm install --workspaces --include-workspace-root
+COPY packages/shared/src packages/shared/src
+COPY packages/client/src packages/client/src
+COPY packages/client/index.html packages/client/vite.config.ts packages/client/
+RUN npm run build:shared && npm run build:client
+
+FROM nginx:alpine
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/packages/client/dist /usr/share/nginx/html
+EXPOSE 8080

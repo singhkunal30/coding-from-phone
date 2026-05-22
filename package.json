@@ -1,0 +1,34 @@
+{
+  "name": "blackout-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multiplayer co-op heist / extraction game prototype",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace=@blackout/shared",
+    "build:server": "npm run build --workspace=@blackout/server",
+    "build:client": "npm run build --workspace=@blackout/client",
+    "build": "npm run build:shared && npm run build:server && npm run build:client",
+    "dev:server": "npm run dev --workspace=@blackout/server",
+    "dev:client": "npm run dev --workspace=@blackout/client",
+    "dev:shared": "npm run dev --workspace=@blackout/shared",
+    "dev": "concurrently -n shared,server,client -c blue,green,magenta \"npm:dev:shared\" \"npm:dev:server\" \"npm:dev:client\"",
+    "smoke": "node scripts/smoke-test.mjs",
+    "start:server": "npm run start --workspace=@blackout/server",
+    "clean": "rimraf packages/*/dist packages/*/node_modules node_modules",
+    "lint": "echo \"(lint placeholder)\"",
+    "typecheck": "tsc -b packages/shared packages/server packages/client --noEmit || true"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
