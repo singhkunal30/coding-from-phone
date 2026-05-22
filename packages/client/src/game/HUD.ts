@@ -68,10 +68,11 @@ export class HUD {
 
     // TL: status, health
     const meStatus = me
-      ? `<div class="label">${escapeHtml(me.name)} &middot; ${me.state}</div>
+      ? `<div class="label">${escapeHtml(me.name)} &middot; ${me.className} &middot; ${me.state}</div>
          <div class="value">${Math.round(me.health)}/${me.maxHealth}</div>
          <div class="health-bar"><div class="fill" style="width:${(me.health / me.maxHealth) * 100}%"></div></div>
-         <div class="label" style="margin-top:8px">Loot: ${me.stolenValue}cr ${me.isCarryingLoot ? '&middot; carrying' : ''} ${me.hasKeycard ? '&middot; keycard' : ''}</div>`
+         <div class="label" style="margin-top:8px">Loot: ${me.stolenValue}cr ${me.isCarryingLoot ? '&middot; carrying' : ''} ${me.hasKeycard ? '&middot; keycard' : ''}</div>
+         ${me.reviveProgress > 0 ? `<div class="label" style="margin-top:6px; color:#f5b042">Being revived ${Math.round(me.reviveProgress * 100)}%</div>` : ''}`
       : `<div class="label">Spectating</div>`;
     this.cards.tl.innerHTML = meStatus;
 
@@ -129,8 +130,19 @@ export class HUD {
     });
     this.cards.bl.innerHTML = `<div class="label">Comms</div><div class="msg-list">${msgs.join('')}</div>`;
 
-    // BC: controls hint
-    this.cards.bc.innerHTML = `<div class="label">WASD move &middot; mouse aim &middot; E interact &middot; Shift sprint &middot; C crouch</div>`;
+    // BC: controls hint + contextual prompts
+    let prompt = '';
+    if (me && me.state === 'alive') {
+      // Find nearest downed teammate within range
+      state.players.forEach((other) => {
+        if (other.id === me.id || other.state !== 'down') return;
+        const d = Math.hypot(other.x - me.x, other.y - me.y);
+        if (d <= 1.6) prompt = `[E] Revive ${escapeHtml(other.name)}`;
+      });
+    }
+    this.cards.bc.innerHTML = prompt
+      ? `<div class="value" style="color: #36e2c2">${prompt}</div>`
+      : `<div class="label">WASD move &middot; mouse aim &middot; E interact &middot; Shift sprint &middot; C crouch</div>`;
 
     // Extract progress
     if (me && me.extractionProgress > 0) {

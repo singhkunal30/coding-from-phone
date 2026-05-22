@@ -2,8 +2,9 @@ import { Room, Client } from '@colyseus/core';
 import {
   HeistState, PlayerSchema, GuardSchema, LootSchema, DoorSchema,
   ExtractionZoneSchema, WallSchema, GameMessage,
-  PLAYER, GUARD, MATCH, LOOT, ALARM, NET, TICK_INTERVAL_MS,
-  MatchPhase, PlayerState, GuardState, InputAction,
+  PLAYER, GUARD, MATCH, LOOT, ALARM, NET, REVIVE, TICK_INTERVAL_MS,
+  MatchPhase, PlayerState, GuardState, GuardType, InputAction,
+  PlayerClass, CLASS_TRAITS,
   clamp, dist, dist2, normalize,
   type ClientInput,
 } from '@blackout/shared';
@@ -18,6 +19,8 @@ interface SessionData {
   lastInputAt: number;
   authToken: string;
   lastNonZeroInputAt: number;
+  reviveTargetId: string | null;
+  reviveProgressMs: number;
 }
 
 export class HeistRoom extends Room<HeistState> {
@@ -57,12 +60,17 @@ export class HeistRoom extends Room<HeistState> {
     logger.info(`[HeistRoom ${this.roomId}] created (seed=${seed} difficulty=${this.state.difficulty})`);
   }
 
-  onJoin(client: Client, options: { name?: string }) {
+  onJoin(client: Client, options: { name?: string; className?: string }) {
     const player = new PlayerSchema();
     player.id = client.sessionId;
     player.name = (options?.name ?? `Operative-${client.sessionId.slice(0, 4)}`).slice(0, 20);
-    player.maxHealth = PLAYER.MAX_HEALTH;
-    player.health = PLAYER.MAX_HEALTH;
+    const cls = (Object.values(PlayerClass) as string[]).includes(options?.className ?? '')
+      ? (options.className as PlayerClass)
+      : PlayerClass.INFILTRATOR;
+    player.className = cls;
+    const trait = CLASS_TRAITS[cls];
+    player.maxHealth = Math.round(PLAYER.MAX_HEALTH * trait.healthMul);
+    player.health = player.maxHealth;
     player.state = PlayerState.ALIVE;
     const spawn = this.mapData.playerSpawns[this.state.players.size % this.mapData.playerSpawns.length];
     player.x = spawn.x;
@@ -74,6 +82,8 @@ export class HeistRoom extends Room<HeistState> {
       lastInputAt: Date.now(),
       authToken: Math.random().toString(36).slice(2),
       lastNonZeroInputAt: Date.now(),
+      reviveTargetId: null,
+      reviveProgressMs: 0,
     });
 
     logger.info(`[HeistRoom ${this.roomId}] join ${player.name} (${client.sessionId})`);
@@ -156,6 +166,7 @@ export class HeistRoom extends Room<HeistState> {
 
     this.spawnLoot();
     this.guardCtrl = new GuardController(this.physics);
+    this.guardCtrl.onChaseTriggered = (g) => this.raiseAlarm(`${g.id} spotted intruders`);
     this.director = new AIDirector(seed);
     this.spawnInitialGuards();
 
@@ -186,32 +197,47 @@ export class HeistRoom extends Room<HeistState> {
   private spawnInitialGuards() {
     const baseCount = 3 + Math.floor(this.state.difficulty * 1.5);
     let i = 0;
+    const variants: GuardType[] = [GuardType.PATROL, GuardType.PATROL, GuardType.SENTRY, GuardType.PATROL, GuardType.HUNTER];
     for (const path of this.mapData.guardPatrolPaths) {
       if (i >= baseCount) break;
-      const id = `guard_${this.nextGuardId++}`;
-      const g = new GuardSchema();
-      g.id = id;
-      g.x = path[0].x; g.y = path[0].y;
-      g.health = GUARD.MAX_HEALTH;
-      g.state = GuardState.PATROL;
-      this.state.guards.set(id, g);
-      this.guardCtrl.register(id, path, g.x, g.y);
+      const variant = variants[i % variants.length];
+      this.createGuard(variant, path);
       i++;
     }
+  }
+
+  private createGuard(variant: GuardType, path: { x: number; y: number }[]): GuardSchema {
+    const id = `guard_${this.nextGuardId++}`;
+    const g = new GuardSchema();
+    g.id = id;
+    g.variant = variant;
+    g.x = path[0].x; g.y = path[0].y;
+    const healthMul = variant === GuardType.HUNTER ? 1.5 : variant === GuardType.SENTRY ? 0.8 : 1.0;
+    g.health = Math.round(GUARD.MAX_HEALTH * healthMul);
+    g.state = GuardState.PATROL;
+    this.state.guards.set(id, g);
+    this.guardCtrl.register(id, variant === GuardType.SENTRY ? [] : path, g.x, g.y);
+    return g;
   }
 
   private spawnReinforcement() {
     if (this.mapData.guardPatrolPaths.length === 0) return;
     const path = this.mapData.guardPatrolPaths[Math.floor(Math.random() * this.mapData.guardPatrolPaths.length)];
-    const id = `guard_${this.nextGuardId++}`;
-    const g = new GuardSchema();
-    g.id = id;
-    g.x = path[0].x; g.y = path[0].y;
-    g.health = GUARD.MAX_HEALTH;
+    const g = this.createGuard(GuardType.HUNTER, path);
     g.state = GuardState.CHASE;
     g.alertLevel = 80;
-    this.state.guards.set(id, g);
-    this.guardCtrl.register(id, path, g.x, g.y);
+  }
+
+  private raiseAlarm(reason: string) {
+    if (this.state.alarmActive) return;
+    this.state.alarmActive = true;
+    this.state.alarmEndsAt = Date.now() + ALARM.DURATION_MS;
+    this.pushMessage('alert', `ALARM RAISED — ${reason}`);
+    logger.info(`[HeistRoom ${this.roomId}] alarm raised: ${reason}`);
+    // The alarm itself is a huge noise event.
+    this.state.players.forEach((p) => {
+      this.guardCtrl.notifyNoise(this.state, p.x, p.y, this.state.mapData.width, 30);
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -347,6 +373,7 @@ export class HeistRoom extends Room<HeistState> {
 
     // Extraction zone progress
     this.processExtraction(dt);
+    this.processRevives(dt);
 
     // Loot carrier vacating extraction zone deposits value? No — only on extract.
 
@@ -356,7 +383,8 @@ export class HeistRoom extends Room<HeistState> {
 
   private applyInput(p: PlayerSchema, input: ClientInput, dt: number) {
     const moveLen = Math.hypot(input.moveX, input.moveY);
-    let speed = PLAYER.SPEED;
+    const trait = CLASS_TRAITS[p.className as PlayerClass] ?? CLASS_TRAITS[PlayerClass.INFILTRATOR];
+    let speed = PLAYER.SPEED * trait.speedMul;
     if (input.actions & InputAction.CROUCH) speed = PLAYER.SPEED_CROUCH;
     if (p.isCarryingLoot) speed *= 0.75;
 
@@ -388,8 +416,33 @@ export class HeistRoom extends Room<HeistState> {
   private tryInteract(client: Client) {
     const p = this.state.players.get(client.sessionId);
     if (!p || p.state !== PlayerState.ALIVE) return;
+    const sess = this.sessions.get(client.sessionId);
 
-    // Doors first (highest priority).
+    // Revive teammate (highest priority — proximity to a downed teammate).
+    let downedTarget: PlayerSchema | null = null;
+    this.state.players.forEach((other) => {
+      if (other === p) return;
+      if (other.state !== PlayerState.DOWN) return;
+      if (dist(p.x, p.y, other.x, other.y) <= REVIVE.RANGE) downedTarget = other;
+    });
+    if (downedTarget && sess) {
+      const t = downedTarget as PlayerSchema;
+      sess.reviveTargetId = sess.reviveTargetId === t.id ? sess.reviveTargetId : t.id;
+      // Pressing interact while already reviving cancels.
+      if (sess.reviveTargetId === t.id && sess.reviveProgressMs > 0 && sess.reviveProgressMs < REVIVE.HOLD_MS) {
+        sess.reviveTargetId = null;
+        sess.reviveProgressMs = 0;
+        t.reviveProgress = 0;
+        return;
+      }
+      sess.reviveTargetId = t.id;
+      sess.reviveProgressMs = 1;
+      t.reviveProgress = 0.001;
+      this.pushMessage('system', `${p.name} is reviving ${t.name}`);
+      return;
+    }
+
+    // Doors first (next priority).
     let bestDoor: DoorSchema | null = null;
     let bestDoorDist = Infinity;
     this.state.doors.forEach((d) => {
@@ -479,6 +532,39 @@ export class HeistRoom extends Room<HeistState> {
       } else {
         this.extractionTimers.delete(p.id);
         p.extractionProgress = 0;
+      }
+    });
+  }
+
+  private processRevives(dt: number) {
+    this.sessions.forEach((sess, sid) => {
+      if (!sess.reviveTargetId) return;
+      const reviver = this.state.players.get(sid);
+      const target = this.state.players.get(sess.reviveTargetId);
+      if (!reviver || !target || reviver.state !== PlayerState.ALIVE || target.state !== PlayerState.DOWN) {
+        if (target) target.reviveProgress = 0;
+        sess.reviveTargetId = null;
+        sess.reviveProgressMs = 0;
+        return;
+      }
+      if (dist(reviver.x, reviver.y, target.x, target.y) > REVIVE.RANGE * 1.1) {
+        // Out of range; abort.
+        target.reviveProgress = 0;
+        sess.reviveTargetId = null;
+        sess.reviveProgressMs = 0;
+        this.pushMessage('alert', `Revive interrupted`);
+        return;
+      }
+      const speed = CLASS_TRAITS[reviver.className as PlayerClass]?.reviveSpeedMul ?? 1;
+      sess.reviveProgressMs += dt * 1000 * speed;
+      target.reviveProgress = clamp(sess.reviveProgressMs / REVIVE.HOLD_MS, 0, 1);
+      if (sess.reviveProgressMs >= REVIVE.HOLD_MS) {
+        target.health = Math.min(target.maxHealth, REVIVE.HEALTH_RESTORE);
+        target.state = PlayerState.ALIVE;
+        target.reviveProgress = 0;
+        sess.reviveTargetId = null;
+        sess.reviveProgressMs = 0;
+        this.pushMessage('system', `${reviver.name} revived ${target.name}`);
       }
     });
   }

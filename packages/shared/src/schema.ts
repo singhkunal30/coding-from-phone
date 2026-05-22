@@ -8,6 +8,7 @@ export class Vec2 extends Schema {
 export class PlayerSchema extends Schema {
   @type('string') id: string = '';
   @type('string') name: string = '';
+  @type('string') className: string = 'infiltrator';
   @type('number') x: number = 0;
   @type('number') y: number = 0;
   @type('number') dirX: number = 0;
@@ -21,12 +22,14 @@ export class PlayerSchema extends Schema {
   @type('boolean') isCarryingLoot: boolean = false;
   @type('boolean') hasKeycard: boolean = false;
   @type('number') extractionProgress: number = 0;  // 0..1
+  @type('number') reviveProgress: number = 0;      // 0..1 (incoming revive %)
   @type('number') lastInputSeq: number = 0;        // for client reconciliation
   @type(['string']) inventory = new ArraySchema<string>();
 }
 
 export class GuardSchema extends Schema {
   @type('string') id: string = '';
+  @type('string') variant: string = 'patrol';      // GuardType
   @type('number') x: number = 0;
   @type('number') y: number = 0;
   @type('number') dirX: number = 1;

@@ -5,6 +5,7 @@ import { ROOM_NAME } from '@blackout/shared';
 export interface ConnectOptions {
   serverUrl: string;
   name: string;
+  className?: string;
   mode?: 'create' | 'join';
 }
 
@@ -16,7 +17,7 @@ export class NetClient {
     const url = opts.serverUrl || this.defaultUrl();
     this.client = new Client(url);
 
-    const joinOpts = { name: opts.name };
+    const joinOpts = { name: opts.name, className: opts.className };
     const room = opts.mode === 'create'
       ? await this.client.create<HeistState>(ROOM_NAME, joinOpts)
       : await this.client.joinOrCreate<HeistState>(ROOM_NAME, joinOpts);

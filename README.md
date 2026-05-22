@@ -2,7 +2,7 @@
 
 > Multiplayer co-op heist / extraction prototype. Authoritative server, browser client, low-poly 3D.
 
-3–5 operatives drop into a procedurally generated facility, slip past patrol guards, steal data drives, and extract before the lockdown timer hits zero. Trip an alarm and the AI Director sends reinforcements your way.
+3–5 operatives drop into a procedurally generated facility, slip past patrol guards, steal data drives, and extract before the lockdown timer hits zero. Trip an alarm and the AI Director sends reinforcements your way. Pick a class — Infiltrator (small profile), Hacker (faster doors), Medic (fast revives), Heavy (more health). Down a teammate? Stand over them and hold E to revive.
 
 ```
 ┌──────────────────┐                ┌────────────────────────────┐
@@ -104,11 +104,11 @@ The smoke test joins two simulated clients, drives inputs, and verifies players 
 
 | Phase | Status | Notes |
 |---|---|---|
-| 1 — Playable foundation | ✅ | Lobby, room join/create, sync, movement, names, basic map |
-| 2 — Core gameplay | ✅ | Guards, vision cones, alert states, alarm, doors+keycards, loot, extraction, timer, health, interaction |
-| 3 — Advanced multiplayer | 🟡 | Reconnection done, latency-tolerant simulation in place, snapshot rate tuned; lag-comp + prediction stubs ready for expansion |
-| 4 — Replayability | ✅ | Procedural maps, randomized loot, difficulty scaling, AI Director, multiple guard behaviors |
-| 5 — Polish | 🟡 | UI + HUD shipped; sound stubs pending; settings/save/progression scaffolded but not implemented |
+| 1 — Playable foundation | ✅ | Lobby, room join/create, sync, movement, names, procedural map |
+| 2 — Core gameplay | ✅ | Guards, vision cones, alert states, alarm raised on chase, doors+keycards, loot, extraction, timer, health, interaction |
+| 3 — Advanced multiplayer | ✅ | Reconnection (30s grace), reconnect token persistence, input rate limiting + clamping, latency-tolerant simulation, snapshot rate tuned, schema-based delta sync, downed-and-revive teamplay |
+| 4 — Replayability | ✅ | Procedural BSP maps, randomized loot, difficulty scaling, AI Director, **3 guard variants** (patrol / sentry / hunter), **4 player classes** (infiltrator / hacker / medic / heavy) |
+| 5 — Polish | 🟡 | UI + HUD, Web-Audio cue system (alarm / pickup / door / extracted / down / revive), mute toggle persisted to localStorage. Pending: settings menu, persistent progression, cosmetics, telemetry |
 
 ## Known limitations
 

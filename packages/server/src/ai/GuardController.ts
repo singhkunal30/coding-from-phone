@@ -1,6 +1,7 @@
 import {
-  GUARD, GuardState, MatchPhase,
+  GUARD, GUARD_VARIANTS, GuardType, GuardState, MatchPhase,
   inCone, dist, dist2, normalize, clamp,
+  CLASS_TRAITS, PlayerClass,
 } from '@blackout/shared';
 import type { HeistState, GuardSchema, PlayerSchema } from '@blackout/shared';
 import { PhysicsWorld } from '../world/Physics.js';
@@ -55,6 +56,9 @@ export class GuardController {
     });
   }
 
+  /** External callback invoked when a guard's alert level crosses the chase threshold. */
+  onChaseTriggered?: (g: GuardSchema) => void;
+
   tick(state: HeistState, dt: number) {
     if (state.phase !== MatchPhase.ACTIVE && state.phase !== MatchPhase.EXTRACTION) return;
     const now = Date.now();
@@ -63,10 +67,12 @@ export class GuardController {
       if (g.state === GuardState.DEAD) return;
       const data = this.state.get(g.id);
       if (!data) return;
+      const variant = GUARD_VARIANTS[(g.variant as GuardType)] ?? GUARD_VARIANTS[GuardType.PATROL];
 
-      const target = this.findVisibleTarget(state, g);
+      const target = this.findVisibleTarget(state, g, variant);
+      const prevAlert = g.alertLevel;
       if (target) {
-        g.alertLevel = clamp(g.alertLevel + GUARD.ALERT_GAIN_VISIBLE_PER_SEC * dt, 0, 100);
+        g.alertLevel = clamp(g.alertLevel + GUARD.ALERT_GAIN_VISIBLE_PER_SEC * variant.alertGainMul * dt, 0, 100);
         data.lastSeenX = target.x;
         data.lastSeenY = target.y;
         data.lastSeenAt = now;
@@ -77,46 +83,60 @@ export class GuardController {
           g.targetPlayerId = '';
         }
       }
+      // Crossed chase threshold this tick → notify (used to raise alarm).
+      if (prevAlert < GUARD.ALERT_THRESHOLD_CHASE && g.alertLevel >= GUARD.ALERT_THRESHOLD_CHASE) {
+        this.onChaseTriggered?.(g);
+      }
 
       // Alarm pulls all guards toward chase regardless of personal vision.
       if (state.alarmActive && g.alertLevel < 60) g.alertLevel = 60;
 
-      // State machine
+      const chaseSpeed = GUARD.CHASE_SPEED * (variant.stationary ? 0 : variant.speedMul);
+      const invSpeed = GUARD.INVESTIGATE_SPEED * (variant.stationary ? 0 : variant.speedMul);
+      const patSpeed = GUARD.PATROL_SPEED * (variant.stationary ? 0 : variant.speedMul);
+
       if (g.alertLevel >= GUARD.ALERT_THRESHOLD_CHASE && target) {
         if (dist(g.x, g.y, target.x, target.y) < GUARD.ATTACK_RANGE) {
           g.state = GuardState.ATTACK;
           this.attack(state, g, target, now, data);
         } else {
           g.state = GuardState.CHASE;
-          this.seekTo(state, g, target.x, target.y, dt, GUARD.CHASE_SPEED);
+          this.seekTo(state, g, target.x, target.y, dt, chaseSpeed);
         }
       } else if (g.alertLevel >= GUARD.ALERT_THRESHOLD_INVESTIGATE) {
         g.state = GuardState.INVESTIGATE;
         const tx = data.lastSeenX, ty = data.lastSeenY;
         if (dist(g.x, g.y, tx, ty) < 0.8) {
-          // arrived, look around for a moment
           g.alertLevel = clamp(g.alertLevel - 12 * dt, 0, 100);
         } else {
-          this.seekTo(state, g, tx, ty, dt, GUARD.INVESTIGATE_SPEED);
+          this.seekTo(state, g, tx, ty, dt, invSpeed);
         }
-      } else if (dist(g.x, g.y, data.spawnX, data.spawnY) > 2 && data.waypoints.length === 0) {
+      } else if (!variant.stationary && dist(g.x, g.y, data.spawnX, data.spawnY) > 2 && data.waypoints.length === 0) {
         g.state = GuardState.RETURN;
-        this.seekTo(state, g, data.spawnX, data.spawnY, dt, GUARD.PATROL_SPEED);
+        this.seekTo(state, g, data.spawnX, data.spawnY, dt, patSpeed);
       } else {
         g.state = GuardState.PATROL;
-        this.patrol(state, g, dt, data);
+        if (variant.stationary) {
+          // Sentries scan slowly back and forth.
+          const t = (now / 1000) * 0.7;
+          const a = Math.sin(t) * 0.9;
+          g.dirX = Math.cos(a);
+          g.dirY = Math.sin(a);
+        } else {
+          this.patrol(state, g, dt, data, patSpeed);
+        }
       }
     });
   }
 
-  private patrol(state: HeistState, g: GuardSchema, dt: number, data: PatrolData) {
+  private patrol(state: HeistState, g: GuardSchema, dt: number, data: PatrolData, speed = GUARD.PATROL_SPEED) {
     if (data.waypoints.length === 0) return;
     const wp = data.waypoints[data.index];
     if (dist(g.x, g.y, wp.x, wp.y) < 0.7) {
       data.index = (data.index + 1) % data.waypoints.length;
       return;
     }
-    this.seekTo(state, g, wp.x, wp.y, dt, GUARD.PATROL_SPEED);
+    this.seekTo(state, g, wp.x, wp.y, dt, speed);
   }
 
   private seekTo(state: HeistState, g: GuardSchema, tx: number, ty: number, dt: number, speed: number) {
@@ -139,14 +159,17 @@ export class GuardController {
   }
 
   /** Returns the closest player visible to the guard, or null. */
-  private findVisibleTarget(state: HeistState, g: GuardSchema): PlayerSchema | null {
-    const halfFov = (GUARD.VISION_FOV_DEG * Math.PI / 180) / 2;
+  private findVisibleTarget(state: HeistState, g: GuardSchema, variant: typeof GUARD_VARIANTS[GuardType]): PlayerSchema | null {
+    const halfFov = (GUARD.VISION_FOV_DEG * variant.fovDegMul * Math.PI / 180) / 2;
+    const range = GUARD.VISION_RANGE * variant.rangeMul;
     let best: PlayerSchema | null = null;
     let bestDist = Infinity;
     state.players.forEach((p) => {
       if (p.state !== 'alive' || !p.connected) return;
-      if (!inCone(p.x, p.y, g.x, g.y, g.dirX, g.dirY, GUARD.VISION_RANGE, halfFov)) {
-        // Hearing fallback: only if very close.
+      // Class trait can shrink/expand the player's effective visibility radius.
+      const visMul = CLASS_TRAITS[p.className as PlayerClass]?.visionRadiusMul ?? 1;
+      const effRange = range * visMul;
+      if (!inCone(p.x, p.y, g.x, g.y, g.dirX, g.dirY, effRange, halfFov)) {
         if (dist2(p.x, p.y, g.x, g.y) > GUARD.HEARING_RANGE * GUARD.HEARING_RANGE) return;
       }
       if (this.physics.lineBlocked(g.x, g.y, p.x, p.y)) return;

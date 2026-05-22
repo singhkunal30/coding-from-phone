@@ -17,6 +17,15 @@
           <input id="player-name" type="text" maxlength="20" placeholder="Operative" />
         </label>
         <label>
+          Class
+          <select id="player-class">
+            <option value="infiltrator">Infiltrator — small profile, fast</option>
+            <option value="hacker">Hacker — faster door bypass</option>
+            <option value="medic">Medic — fast revives</option>
+            <option value="heavy">Heavy — more health, slower</option>
+          </select>
+        </label>
+        <label>
           Server
           <input id="server-url" type="text" placeholder="ws://localhost:2567" />
         </label>
@@ -25,6 +34,10 @@
           <button id="btn-join">Quick Match</button>
         </div>
         <div id="menu-status" class="status"></div>
+        <label style="margin-top: 12px;">
+          <input id="mute-audio" type="checkbox" style="width: auto; margin-right: 6px; display: inline-block; vertical-align: middle;" />
+          <span style="text-transform: none; letter-spacing: 0; color: var(--text); font-size: 13px;">Mute audio cues</span>
+        </label>
         <div class="footer">v<span id="version"></span> &middot; co-op heist prototype</div>
       </div>
       <div id="end-screen" class="panel hidden">

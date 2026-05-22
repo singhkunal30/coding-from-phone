@@ -25,21 +25,67 @@ export const PLAYER = {
 } as const;
 
 export const GUARD = {
-  PATROL_SPEED: 2.2,
-  INVESTIGATE_SPEED: 3.5,
-  CHASE_SPEED: 5.0,
-  VISION_RANGE: 10,
-  VISION_FOV_DEG: 90,
-  HEARING_RANGE: 7,
-  ATTACK_RANGE: 1.2,
-  ATTACK_DAMAGE: 25,
-  ATTACK_COOLDOWN_MS: 800,
-  MAX_HEALTH: 75,
-  ALERT_DECAY_PER_SEC: 8,
-  ALERT_GAIN_VISIBLE_PER_SEC: 60,
-  ALERT_THRESHOLD_INVESTIGATE: 30,
-  ALERT_THRESHOLD_CHASE: 80,
-  LOST_SIGHT_TIMEOUT_MS: 4000,
+  PATROL_SPEED: 2.2 as number,
+  INVESTIGATE_SPEED: 3.5 as number,
+  CHASE_SPEED: 5.0 as number,
+  VISION_RANGE: 10 as number,
+  VISION_FOV_DEG: 90 as number,
+  HEARING_RANGE: 7 as number,
+  ATTACK_RANGE: 1.2 as number,
+  ATTACK_DAMAGE: 25 as number,
+  ATTACK_COOLDOWN_MS: 800 as number,
+  MAX_HEALTH: 75 as number,
+  ALERT_DECAY_PER_SEC: 8 as number,
+  ALERT_GAIN_VISIBLE_PER_SEC: 60 as number,
+  ALERT_THRESHOLD_INVESTIGATE: 30 as number,
+  ALERT_THRESHOLD_CHASE: 80 as number,
+  LOST_SIGHT_TIMEOUT_MS: 4000 as number,
+} as const;
+
+export enum GuardType {
+  PATROL = 'patrol',     // standard, default
+  SENTRY = 'sentry',     // stationary; wider FOV; faster alert
+  HUNTER = 'hunter',     // faster chase, narrower FOV, more health
+}
+
+export const GUARD_VARIANTS: Record<GuardType, {
+  speedMul: number;
+  fovDegMul: number;
+  rangeMul: number;
+  healthMul: number;
+  alertGainMul: number;
+  stationary: boolean;
+}> = {
+  [GuardType.PATROL]: { speedMul: 1.0,  fovDegMul: 1.0, rangeMul: 1.0,  healthMul: 1.0,  alertGainMul: 1.0, stationary: false },
+  [GuardType.SENTRY]: { speedMul: 0.0,  fovDegMul: 1.5, rangeMul: 1.25, healthMul: 0.8,  alertGainMul: 1.4, stationary: true  },
+  [GuardType.HUNTER]: { speedMul: 1.25, fovDegMul: 0.75, rangeMul: 1.1, healthMul: 1.5,  alertGainMul: 0.9, stationary: false },
+};
+
+export enum PlayerClass {
+  INFILTRATOR = 'infiltrator',
+  HACKER = 'hacker',
+  MEDIC = 'medic',
+  HEAVY = 'heavy',
+}
+
+export const CLASS_TRAITS: Record<PlayerClass, {
+  speedMul: number;
+  healthMul: number;
+  visionRadiusMul: number;     // how easily guards see them
+  interactSpeedMul: number;
+  reviveSpeedMul: number;
+  description: string;
+}> = {
+  [PlayerClass.INFILTRATOR]: { speedMul: 1.1, healthMul: 0.9, visionRadiusMul: 0.7, interactSpeedMul: 1.0, reviveSpeedMul: 1.0, description: 'Smaller silhouette, faster on foot.' },
+  [PlayerClass.HACKER]:      { speedMul: 1.0, healthMul: 0.9, visionRadiusMul: 1.0, interactSpeedMul: 1.5, reviveSpeedMul: 0.8, description: 'Bypasses doors faster.' },
+  [PlayerClass.MEDIC]:       { speedMul: 1.0, healthMul: 1.0, visionRadiusMul: 1.0, interactSpeedMul: 1.0, reviveSpeedMul: 1.8, description: 'Revives downed teammates quickly.' },
+  [PlayerClass.HEAVY]:       { speedMul: 0.85, healthMul: 1.5, visionRadiusMul: 1.2, interactSpeedMul: 0.9, reviveSpeedMul: 0.9, description: 'More health, soaks damage.' },
+};
+
+export const REVIVE = {
+  HOLD_MS: 4000 as number,
+  RANGE: 1.6 as number,
+  HEALTH_RESTORE: 60 as number,
 } as const;
 
 export const MATCH = {

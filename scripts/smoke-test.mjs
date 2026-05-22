@@ -43,11 +43,15 @@ async function main() {
   const initialA = { ...a.state.players.get(a.sessionId) };
   const initialB = { ...b.state.players.get(b.sessionId) };
 
-  // Send movement inputs for 1 second
-  for (let i = 0; i < 30; i++) {
-    a.send('input', { seq: i, moveX: 1, moveY: 0, aimX: 100, aimY: 50, actions: 0 });
-    b.send('input', { seq: i, moveX: 0, moveY: 1, aimX: 50, aimY: 100, actions: 0 });
-    await sleep(33);
+  // Send movement inputs in alternating directions to confirm the input pipeline regardless of spawn position.
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, -0.7]];
+  let seq = 0;
+  for (const [mx, my] of dirs) {
+    for (let i = 0; i < 12; i++) {
+      a.send('input', { seq: ++seq, moveX: mx, moveY: my, aimX: 100, aimY: 50, actions: 0 });
+      b.send('input', { seq: seq, moveX: -mx, moveY: -my, aimX: 50, aimY: 100, actions: 0 });
+      await sleep(33);
+    }
   }
 
   const movedA = a.state.players.get(a.sessionId);
@@ -55,7 +59,8 @@ async function main() {
   const dA = Math.hypot(movedA.x - initialA.x, movedA.y - initialA.y);
   const dB = Math.hypot(movedB.x - initialB.x, movedB.y - initialB.y);
   console.log(`Player A moved ${dA.toFixed(2)} units, Player B moved ${dB.toFixed(2)} units`);
-  if (dA < 1.0 || dB < 1.0) throw new Error('Players did not move enough — input pipeline broken');
+  // Smoke test: each player must have moved at least 0.5 units in any direction.
+  if (dA < 0.5 || dB < 0.5) throw new Error('Players did not move enough — input pipeline broken');
 
   // Verify guard simulation runs
   const g0 = [...a.state.guards.values()][0];

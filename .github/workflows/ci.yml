@@ -19,10 +19,12 @@ jobs:
       - run: npm run build:shared
       - run: npm run build:server
       - run: npm run build:client
-      - name: Smoke test
+      - name: Smoke tests
         run: |
           node packages/server/dist/index.js &
           SERVER_PID=$!
           sleep 3
           node scripts/smoke-test.mjs
-          kill $SERVER_PID
+          node scripts/gameplay-test.mjs
+          node scripts/revive-test.mjs
+          kill $SERVER_PID || true

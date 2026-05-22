@@ -183,7 +183,7 @@ export class Renderer {
         mesh = this.createGuardMesh();
         this.scene.add(mesh);
         this.guardMeshes.set(g.id, mesh);
-        cone = this.createVisionCone();
+        cone = this.createVisionCone(g.variant);
         this.scene.add(cone);
         this.guardCones.set(g.id, cone);
       }
@@ -193,10 +193,13 @@ export class Renderer {
       mesh.rotation.y = Math.atan2(g.dirX, g.dirY);
       const body = mesh.getObjectByName('body') as THREE.Mesh;
       const mat = body.material as THREE.MeshStandardMaterial;
+      const variantColor = g.variant === 'hunter' ? 0xb53b54
+        : g.variant === 'sentry' ? 0xa0734a
+        : 0x8a93a3;
       if (g.state === 'chase' || g.state === 'attack') mat.color.setHex(0xff4d6a);
       else if (g.state === 'investigate') mat.color.setHex(0xf5b042);
       else if (g.state === 'dead') mat.color.setHex(0x1c1f25);
-      else mat.color.setHex(0x8a93a3);
+      else mat.color.setHex(variantColor);
 
       if (cone) {
         cone.position.copy(mesh.position);
@@ -292,9 +295,11 @@ export class Renderer {
     return group;
   }
 
-  private createVisionCone(): THREE.Mesh {
-    const halfFov = (GUARD.VISION_FOV_DEG * Math.PI / 180) / 2;
-    const range = GUARD.VISION_RANGE;
+  private createVisionCone(variant: string = 'patrol'): THREE.Mesh {
+    const fovMul = variant === 'sentry' ? 1.5 : variant === 'hunter' ? 0.75 : 1.0;
+    const rangeMul = variant === 'sentry' ? 1.25 : variant === 'hunter' ? 1.1 : 1.0;
+    const halfFov = (GUARD.VISION_FOV_DEG * fovMul * Math.PI / 180) / 2;
+    const range = GUARD.VISION_RANGE * rangeMul;
     const shape = new THREE.Shape();
     shape.moveTo(0, 0);
     const segments = 12;
