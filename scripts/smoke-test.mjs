@@ -40,27 +40,28 @@ async function main() {
   if (a.state.mapData.walls.length === 0) throw new Error('No walls generated');
 
   // Record initial player positions
-  const initialA = { ...a.state.players.get(a.sessionId) };
-  const initialB = { ...b.state.players.get(b.sessionId) };
+  const initialA = { x: a.state.players.get(a.sessionId).x, y: a.state.players.get(a.sessionId).y };
+  const initialB = { x: b.state.players.get(b.sessionId).x, y: b.state.players.get(b.sessionId).y };
 
-  // Send movement inputs in alternating directions to confirm the input pipeline regardless of spawn position.
-  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, -0.7]];
+  // Sweep four directions and track the MAX displacement seen (so we don't get fooled
+  // when a +X / -X round trip cancels out near the end). At least one direction must
+  // produce real movement, regardless of which wall is nearest.
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  let maxA = 0, maxB = 0;
   let seq = 0;
   for (const [mx, my] of dirs) {
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 18; i++) {
       a.send('input', { seq: ++seq, moveX: mx, moveY: my, aimX: 100, aimY: 50, actions: 0 });
-      b.send('input', { seq: seq, moveX: -mx, moveY: -my, aimX: 50, aimY: 100, actions: 0 });
+      b.send('input', { seq: seq, moveX: mx, moveY: my, aimX: 50, aimY: 100, actions: 0 });
       await sleep(33);
+      const pa = a.state.players.get(a.sessionId);
+      const pb = b.state.players.get(b.sessionId);
+      maxA = Math.max(maxA, Math.hypot(pa.x - initialA.x, pa.y - initialA.y));
+      maxB = Math.max(maxB, Math.hypot(pb.x - initialB.x, pb.y - initialB.y));
     }
   }
-
-  const movedA = a.state.players.get(a.sessionId);
-  const movedB = b.state.players.get(b.sessionId);
-  const dA = Math.hypot(movedA.x - initialA.x, movedA.y - initialA.y);
-  const dB = Math.hypot(movedB.x - initialB.x, movedB.y - initialB.y);
-  console.log(`Player A moved ${dA.toFixed(2)} units, Player B moved ${dB.toFixed(2)} units`);
-  // Smoke test: each player must have moved at least 0.5 units in any direction.
-  if (dA < 0.5 || dB < 0.5) throw new Error('Players did not move enough — input pipeline broken');
+  console.log(`Player A max-displacement ${maxA.toFixed(2)} units, Player B max-displacement ${maxB.toFixed(2)} units`);
+  if (maxA < 1.0 || maxB < 1.0) throw new Error('Players did not move enough — input pipeline broken');
 
   // Verify guard simulation runs
   const g0 = [...a.state.guards.values()][0];
