@@ -111,3 +111,79 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 #end-summary table { margin: 12px 0; width: 100%; border-collapse: collapse; font-size: 13px; }
 #end-summary th, #end-summary td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--panel-border); }
 #end-summary th { color: var(--muted); font-weight: 500; }
+
+/* Minimap --------------------------------------------------------- */
+#minimap {
+  position: fixed;
+  top: 16px; right: 16px;
+  padding: 6px;
+  background: rgba(10, 14, 20, 0.85);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  z-index: 6;
+  pointer-events: none;
+}
+#minimap canvas {
+  display: block;
+  image-rendering: pixelated;
+  border-radius: 4px;
+}
+/* When minimap is visible, push the TR HUD card down so they don't overlap. */
+#hud .corner.tr { top: 220px; }
+
+/* Touch controls -------------------------------------------------- */
+#touch-controls {
+  position: fixed; inset: 0; pointer-events: none; z-index: 7;
+  touch-action: none;
+}
+#touch-controls.hidden { display: none; }
+.touch-stick {
+  position: absolute;
+  width: 128px; height: 128px;
+  border-radius: 50%;
+  background: rgba(20, 24, 32, 0.55);
+  border: 2px solid rgba(54, 226, 194, 0.4);
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.touch-knob {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 56px; height: 56px;
+  margin-left: -28px; margin-top: -28px;
+  border-radius: 50%;
+  background: rgba(54, 226, 194, 0.45);
+  border: 2px solid rgba(54, 226, 194, 0.9);
+  transition: transform 0.05s linear;
+}
+#touch-interact {
+  position: fixed;
+  right: max(28px, env(safe-area-inset-right));
+  bottom: max(28px, env(safe-area-inset-bottom));
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  background: rgba(54, 226, 194, 0.85);
+  color: #04201a;
+  font-size: 28px; font-weight: 700;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  pointer-events: auto;
+  touch-action: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  z-index: 8;
+}
+#touch-interact:active { transform: scale(0.93); background: #5dffdb; }
+
+/* Tighten HUD spacing on small screens / mobile portrait. */
+@media (max-width: 720px) {
+  #hud .corner { font-size: 11px; padding: 8px 10px; min-width: 0; }
+  #hud .corner.tl { top: 12px; left: 12px; max-width: 50vw; }
+  #hud .corner.tr { top: 200px; right: 12px; max-width: 45vw; }
+  #hud .corner.bl { bottom: 120px; left: 12px; max-width: 70vw; }
+  #hud .corner.br { display: none; }
+  #hud .corner.tc { top: 12px; }
+  #hud .corner.bc { bottom: 12px; max-width: 90vw; font-size: 10px; padding: 6px 8px; min-width: 0; }
+  #minimap { top: 12px; right: 12px; }
+  #minimap canvas { width: 140px; height: 140px; }
+  .panel { min-width: 0; width: calc(100vw - 32px); padding: 22px 20px; }
+}

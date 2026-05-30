@@ -140,9 +140,12 @@ export class HUD {
         if (d <= 1.6) prompt = `[E] Revive ${escapeHtml(other.name)}`;
       });
     }
+    const touchMode = document.getElementById('touch-controls')?.classList.contains('hidden') === false;
     this.cards.bc.innerHTML = prompt
       ? `<div class="value" style="color: #36e2c2">${prompt}</div>`
-      : `<div class="label">WASD move &middot; mouse aim &middot; E interact &middot; Shift sprint &middot; C crouch</div>`;
+      : touchMode
+        ? `<div class="label">Left stick: move &middot; Right stick: aim &middot; E button: interact</div>`
+        : `<div class="label">WASD move &middot; mouse aim &middot; E interact &middot; Shift sprint &middot; C crouch</div>`;
 
     // Extract progress
     if (me && me.extractionProgress > 0) {

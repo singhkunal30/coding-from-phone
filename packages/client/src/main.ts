@@ -3,6 +3,8 @@ import { Renderer } from './game/Renderer.js';
 import { InputManager } from './game/Input.js';
 import { HUD } from './game/HUD.js';
 import { audio } from './game/Audio.js';
+import { TouchControls } from './game/TouchControls.js';
+import { Minimap } from './game/Minimap.js';
 import { CLIENT_INPUT_RATE, MatchPhase } from '@blackout/shared';
 import type { HeistState } from '@blackout/shared';
 
@@ -38,6 +40,9 @@ const net = new NetClient();
 const renderer = new Renderer(canvas);
 const input = new InputManager(canvas);
 const hud = new HUD();
+const touch = new TouchControls(document.body);
+input.bindTouch(touch);
+const minimap = new Minimap(document.getElementById('hud') as HTMLElement);
 
 let inputSeq = 0;
 let inputTimer = 0;
@@ -166,13 +171,15 @@ const loop = (now: number) => {
     }
     renderer.update(state);
     hud.update(state, room.sessionId);
+    minimap.update(state, room.sessionId);
     driveCues(state, room.sessionId);
 
     inputTimer += dt;
     const interval = 1 / CLIENT_INPUT_RATE;
     if (inputTimer >= interval) {
       inputTimer = 0;
-      const snap = input.poll((x, y) => renderer.screenToWorld(x, y));
+      const me = state.players.get(room.sessionId);
+      const snap = input.poll((x, y) => renderer.screenToWorld(x, y), me ? { x: me.x, y: me.y } : undefined);
       inputSeq++;
       net.sendInput({
         seq: inputSeq, moveX: snap.moveX, moveY: snap.moveY,
